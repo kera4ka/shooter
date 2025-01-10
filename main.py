@@ -1,5 +1,6 @@
 from pygame import *
 from random import randint
+from time import time as timer
 
 # вынесем размер окна в константы для удобства
 # W - width, ширина
@@ -23,6 +24,9 @@ size = 70
 
 SCORE = 10
 DEAD = 5
+HEALTH = 2
+BULLETIKI = 4
+RECHARGE = 3
 
 class GameSprite(sprite.Sprite):
     def __init__(self,img,x,y,width=65,height=65,speed=SPEED1):
@@ -48,20 +52,44 @@ class Bullet(GameSprite):
         self.rect.y -= (self.speed)
 
 class Player(GameSprite):
-    def __init__(self,img,x,y,width=65,height=65,speed=SPEED1):
+    def __init__(self,img,x,y,width=65,height=65,speed=SPEED1,
+            health = HEALTH,bulletiki = BULLETIKI,recharge = RECHARGE):
         super().__init__(img,x,y,width,height,speed)
         self.bullets = sprite.Group()
         self.score = 0
         self.lost = 0
+        self.health = health
+        self.totalbullets = bulletiki
+        self.bulletiki = 0
+        self.is_recharge = False
+        self.recharge_time = recharge
+        self.carenttimer = 0
+        self.lasttimer = 0   
     def update(self):
         keys_pressed = key.get_pressed()
         if keys_pressed[K_LEFT] and self.rect.x>0:
             self.rect.x -= self.speed
         if keys_pressed[K_RIGHT] and self.rect.x<WIN_W-self.rect.width:
             self.rect.x += self.speed
-    def shoot(self):
-        bullet = Bullet('bullet.png',self.rect.x +(self.rect.width//2),self.rect.y,2,10 )
-        self.bullets.add(bullet)
+    def shoot(self,window,perezarad):
+        if self.bulletiki <self.totalbullets and not self.is_recharge:
+            bullet = Bullet('bullet.png',self.rect.x +(self.rect.width//2),self.rect.y,2,10 )
+            self.bulletiki += 1
+            self.bullets.add(bullet)
+
+        if self.bulletiki >=self.totalbullets and not self.is_recharge:
+            self.lasttimer = timer()
+            self.is_recharge = True
+
+        if self.is_recharge:
+            self.carenttimer = timer()
+
+            if self.carenttimer - self.lasttimer < self.recharge_time:
+                window.blit(perezarad,(300,200))
+                
+            else:
+                self.bulletiki = 0
+                self.is_recharge = False
 
 class Enemy(GameSprite):
     def __init__(self,img,x,y,width=65,height=65,speed=SPEED2):
@@ -94,6 +122,7 @@ win = my_font.render('мировладелец', True, GREEN)
 lose = my_font.render('шарики', True, RED)
 schet_txt = my_font2.render('счет:',True,GREEN)
 propusk_txt = my_font2.render('пропуск:',True,GREEN)
+perezarad = my_font.render('перезарядка',True,RED)
 
 schet = my_font2.render('0',True,GREEN)
 propusk = my_font2.render('0',True,GREEN)
@@ -133,7 +162,8 @@ while game:
         if e.type == QUIT:
             game = False
         if e.type == MOUSEBUTTONDOWN and e.button == 1:
-            rocket.shoot()                
+
+            rocket.shoot(window,perezarad)                
     # отобразить картинку фона
     if not finish:
         window.blit(background,(0, 0))
@@ -151,16 +181,19 @@ while game:
         rocket.bullets.update()
 
         rocket_vs_asteroids = sprite.spritecollide(
-            rocket,asteroids,False
+            rocket,asteroids,True
         )
         bullets_vs_asteroids = sprite.groupcollide(
             rocket.bullets,asteroids,True,True
         )
 
-        if rocket_vs_asteroids or rocket.lost >= DEAD : 
-            window.blit(lose,(100,200)) 
-            display.update()
-            finish = True
+        if rocket_vs_asteroids or rocket.lost >= DEAD :
+            if rocket.health == 0:
+                window.blit(lose,(100,200)) 
+                display.update()
+                finish = True
+            else:
+                rocket.health -= 1
         if rocket.score >= SCORE:
             window.blit(win,(0,200))
             display.update()
